@@ -73,10 +73,10 @@ python3 audio.py                 # mix.wav: original generated music and sound e
 | Full YOLO disease model | Planned: trained on nursery photos during the pilot (the prototype uses the greenness score) |
 | Bird detection | BirdNET via birdnetlib; detections are candidates that an ecologist verifies |
 
-## Hardware (prototype, about RM950–1,550)
+## Hardware 
 
 Raspberry Pi 4/5, Pi Camera Module 3, MLX90640 thermal camera, two SHT31 temperature and humidity sensors (rover and reference station), USB microphone, GPS module, 6WD chassis with motor driver, battery pack.
 
 ## Team
 
-[Team name] · [University]
+[BedongBrawlers] · [UiTM KEDAH]

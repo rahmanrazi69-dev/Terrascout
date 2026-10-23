@@ -1,0 +1,8 @@
+numpy>=1.24
+pillow>=10
+# Optional, on the Raspberry Pi:
+# picamera2
+# pupil-apriltags
+# adafruit-circuitpython-mlx90640
+# adafruit-circuitpython-sht31d
+# birdnetlib

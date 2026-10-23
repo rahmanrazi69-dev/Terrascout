@@ -1,0 +1,548 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>TerraScout Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Public+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+</head>
+<body>
+<style>
+/* Layout: operations console. Header with rover state, KPI strip, map + tickets, then three analysis panels. */
+:root{
+  --bg:#F2F5F1; --surface:#FFFFFF; --surface-2:#F7F9F6; --ink:#13201A; --muted:#5A6A61; --line:#DCE4DC;
+  --accent:#0B7A5C; --accent-ink:#FFFFFF; --accent-soft:#DDF0E7;
+  --heat:#E2552C; --cool:#2B7CC0; --bird:#7650CF; --good:#1E8A4C; --warn:#B9800A; --crit:#C4362B;
+  --good-soft:#E1F3E7; --warn-soft:#FBF0D6; --crit-soft:#FBE3E0; --bird-soft:#EEE7FB;
+  --lawn:#DCEBC9; --canopy:#9FCB8A; --canopy-edge:#7FB46B; --water:#B8DCEB; --pathc:#D9CBB0; --plaza:#E8E1D3;
+  --display:"Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --body:"Public Sans", "Segoe UI", system-ui, sans-serif;
+  --mono:"JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#0E1512; --surface:#151F1A; --surface-2:#1A2620; --ink:#E5EEE8; --muted:#93A59B; --line:#27352E;
+  --accent:#3CC594; --accent-ink:#06261B; --accent-soft:#16392D;
+  --heat:#FF7B52; --cool:#5AAAE8; --bird:#A88CFF; --good:#4CC37E; --warn:#E8B43C; --crit:#FF6B5E;
+  --good-soft:#163323; --warn-soft:#3A2F12; --crit-soft:#3F1C19; --bird-soft:#2A2145;
+  --lawn:#1E2D20; --canopy:#2E5233; --canopy-edge:#3E6B42; --water:#1C3946; --pathc:#4A4232; --plaza:#3A3529;
+  color-scheme:dark } }
+:root[data-theme="dark"]{
+  --bg:#0E1512; --surface:#151F1A; --surface-2:#1A2620; --ink:#E5EEE8; --muted:#93A59B; --line:#27352E;
+  --accent:#3CC594; --accent-ink:#06261B; --accent-soft:#16392D;
+  --heat:#FF7B52; --cool:#5AAAE8; --bird:#A88CFF; --good:#4CC37E; --warn:#E8B43C; --crit:#FF6B5E;
+  --good-soft:#163323; --warn-soft:#3A2F12; --crit-soft:#3F1C19; --bird-soft:#2A2145;
+  --lawn:#1E2D20; --canopy:#2E5233; --canopy-edge:#3E6B42; --water:#1C3946; --pathc:#4A4232; --plaza:#3A3529;
+  color-scheme:dark }
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:14px;line-height:1.45;
+  padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));padding-block:20px 40px}
+.wrap{max-width:1320px;margin:0 auto;display:grid;gap:16px}
+h1,h2,h3{font-family:var(--display);margin:0;text-wrap:balance}
+h1{font-size:22px;font-weight:700;letter-spacing:-.01em}
+h2{font-size:15px;font-weight:700}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+.label{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
+button{font:inherit;cursor:pointer;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:7px 12px;font-weight:600;font-size:13px}
+button:hover{border-color:var(--accent)}
+button:focus-visible,.sap:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+button.small{padding:4px 9px;font-size:12px}
+button:disabled{opacity:.5;cursor:default}
+
+/* Header */
+header{display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px;justify-content:space-between}
+.brand{display:flex;align-items:center;gap:12px}
+.logo{width:36px;height:36px;border-radius:9px;background:var(--accent);display:grid;place-items:center;flex:none}
+.sub{font-size:13px;color:var(--muted)}
+.rover{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px}
+.pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:600;white-space:nowrap}
+.pill .dot{width:7px;height:7px;border-radius:50%;background:currentColor}
+.p-good{background:var(--good-soft);color:var(--good)} .p-warn{background:var(--warn-soft);color:var(--warn)}
+.p-crit{background:var(--crit-soft);color:var(--crit)} .p-bird{background:var(--bird-soft);color:var(--bird)}
+.p-acc{background:var(--accent-soft);color:var(--accent)} .p-mute{background:var(--surface-2);color:var(--muted);border:1px solid var(--line)}
+.stat{font-size:12px;color:var(--muted)} .stat b{color:var(--ink);font-weight:600}
+.sim{font-size:11px;font-weight:600;color:var(--warn);border:1px dashed var(--warn);border-radius:6px;padding:2px 7px}
+
+/* KPI strip */
+.kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px;display:grid;gap:4px;min-width:0}
+.kpi .v{font-family:var(--display);font-size:28px;font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums}
+.kpi .d{font-size:12px;color:var(--muted)}
+.kpi.flag{border-color:var(--warn)}
+
+/* Panels */
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;min-width:0;display:grid;gap:12px;align-content:start}
+.ph{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.main{display:grid;grid-template-columns:minmax(0,1.75fr) minmax(0,1fr);gap:16px}
+.side{display:grid;gap:16px;align-content:start}
+.row3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+
+/* Map */
+.mapbox{position:relative;border-radius:10px;overflow:hidden;border:1px solid var(--line);background:var(--lawn)}
+svg.map{display:block;width:100%;height:auto}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.sw{width:10px;height:10px;border-radius:50%;display:inline-block}
+.sap{cursor:pointer}
+.ctrl{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.prog{height:6px;background:var(--surface-2);border:1px solid var(--line);border-radius:99px;overflow:hidden;flex:1;min-width:80px}
+.prog i{display:block;height:100%;width:0;background:var(--accent)}
+
+/* Detail drawer */
+.detail{display:grid;grid-template-columns:88px minmax(0,1fr);gap:12px;align-items:start;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:12px}
+.detail h3{font-size:15px}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;font-size:12px;margin-top:6px}
+.kv dt{color:var(--muted)} .kv dd{margin:0}
+
+/* Tickets */
+.tickets{display:grid;gap:8px}
+.ticket{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:grid;gap:6px;background:var(--surface)}
+.ticket.new{animation:flash 1.6s ease-out}
+@keyframes flash{from{background:var(--warn-soft)}to{background:var(--surface)}}
+.t-top{display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap}
+.t-title{font-weight:600}
+.t-meta{font-size:12px;color:var(--muted)}
+.t-ai{font-size:12px;border-left:3px solid var(--bird);padding-left:8px}
+
+/* Tables */
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);text-align:left;font-weight:600;padding:0 6px 6px}
+td{padding:7px 6px;border-top:1px solid var(--line);vertical-align:middle}
+td.n,th.n{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums}
+tr.fresh td{animation:flash 1.6s ease-out}
+.tablewrap{overflow-x:auto}
+
+/* Audit */
+.log{display:grid;gap:0;font-size:12px}
+.log .r{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:8px;padding:6px 0;border-top:1px solid var(--line);align-items:center}
+.log .r.bad{background:var(--crit-soft)}
+.hash{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.chain{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+
+.resident{background:var(--accent-soft);border-color:transparent}
+.resident p{margin:0}
+.toast{position:fixed;right:max(16px, env(safe-area-inset-right, 0px));bottom:calc(16px + env(safe-area-inset-bottom, 0px));background:var(--ink);color:var(--bg);padding:10px 14px;border-radius:10px;font-size:13px;max-width:340px;box-shadow:0 6px 24px rgba(0,0,0,.18);transition:opacity .3s, transform .3s;opacity:0;transform:translateY(8px);pointer-events:none;z-index:20}
+.toast.on{opacity:1;transform:none}
+footer{font-size:12px;color:var(--muted)}
+
+@media (max-width:1080px){ .kpis{grid-template-columns:repeat(3,minmax(0,1fr))} .main{grid-template-columns:1fr} .row3{grid-template-columns:1fr} }
+@media (max-width:560px){ .kpis{grid-template-columns:repeat(2,minmax(0,1fr))} .kpi .v{font-size:23px} .detail{grid-template-columns:1fr} }
+@media (prefers-reduced-motion: reduce){ *{animation:none!important;transition:none!important} }
+</style>
+
+<div class="wrap">
+<header>
+  <div class="brand">
+    <div class="logo" aria-hidden="true">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 3l7 11H5z" fill="var(--accent-ink)"/><rect x="5" y="15" width="14" height="3" rx="1.5" fill="var(--accent-ink)"/><circle cx="8" cy="20.5" r="1.6" fill="var(--accent-ink)"/><circle cx="12" cy="20.5" r="1.6" fill="var(--accent-ink)"/><circle cx="16" cy="20.5" r="1.6" fill="var(--accent-ink)"/></svg>
+    </div>
+    <div>
+      <h1>TerraScout Console</h1>
+      <div class="sub">Elmina Central Park · Rover TS-1 · Sustainability &amp; landscaping view</div>
+    </div>
+  </div>
+  <div class="rover">
+    <span class="sim" title="All figures on this page are simulated sample data for the prototype">Simulated data</span>
+    <span id="roverState" class="pill p-mute"><span class="dot"></span>Docked</span>
+    <span class="stat">Battery <b id="batt" class="mono">96%</b></span>
+    <span class="stat">Last sync <b id="lastSync" class="mono">15:12</b></span>
+  </div>
+</header>
+
+<section class="kpis" aria-label="Key indicators">
+  <div class="kpi"><span class="label">Tagged sapling survival</span><span class="v" id="kSurv">–</span><span class="d" id="kSurvD">–</span></div>
+  <div class="kpi" id="kFlagBox"><span class="label">Saplings needing care</span><span class="v" id="kFlag">–</span><span class="d" id="kFlagD">–</span></div>
+  <div class="kpi"><span class="label">Bird species this week</span><span class="v" id="kSp">–</span><span class="d" id="kSpD">–</span></div>
+  <div class="kpi"><span class="label">Shade cooling</span><span class="v" id="kDT">–</span><span class="d">Canopy vs open path, air temp.</span></div>
+  <div class="kpi"><span class="label">Audit trail</span><span class="v" id="kAud">–</span><span class="d" id="kAudD">–</span></div>
+</section>
+
+<section class="main">
+  <div class="panel">
+    <div class="ph">
+      <h2>Patrol map</h2>
+      <div class="legend">
+        <span><i class="sw" style="background:var(--good)"></i>Healthy</span>
+        <span><i class="sw" style="background:var(--warn)"></i>Watch</span>
+        <span><i class="sw" style="background:var(--crit)"></i>Stressed / lost</span>
+        <span><i class="sw" style="background:var(--bird)"></i>Sound station</span>
+        <span><i class="sw" style="background:linear-gradient(90deg,var(--cool),var(--heat))"></i>Heat vs reference</span>
+      </div>
+    </div>
+    <div class="mapbox">
+      <svg class="map" id="map" viewBox="0 0 800 480" role="img" aria-label="Park map with patrol route, tagged saplings, sound stations and heat readings">
+        <rect width="800" height="480" fill="var(--lawn)"/>
+        <g id="canopyLayer"></g>
+        <path d="M520 300 C 540 240, 640 230, 690 270 S 720 360, 650 380 S 520 370, 520 300 Z" fill="var(--water)"/>
+        <text x="612" y="318" text-anchor="middle" font-size="12" fill="var(--muted)" font-family="var(--body)">Lake</text>
+        <rect x="40" y="380" width="120" height="74" rx="10" fill="var(--plaza)"/>
+        <text x="100" y="472" text-anchor="middle" font-size="11" fill="var(--muted)" font-family="var(--body)">Plaza · solar dock</text>
+        <path id="route" d="M110 410 C 120 330, 150 250, 220 205 S 340 120, 430 118 S 560 135, 600 185 S 720 250, 735 320 S 700 430, 600 438 S 430 420, 360 415 S 220 445, 150 432 S 105 420, 110 410" fill="none" stroke="var(--pathc)" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+        <g id="heatLayer"></g>
+        <g id="refStation">
+          <rect x="300" y="282" width="16" height="16" rx="3" fill="var(--surface)" stroke="var(--ink)" stroke-width="1.5"/>
+          <text x="308" y="314" text-anchor="middle" font-size="11" fill="var(--muted)" font-family="var(--body)">Reference station</text>
+        </g>
+        <g id="dock"><rect x="94" y="398" width="28" height="22" rx="4" fill="var(--accent)"/><path d="M98 404h20M98 410h20" stroke="var(--accent-ink)" stroke-width="1.5"/></g>
+        <g id="birdLayer"></g>
+        <g id="sapLayer"></g>
+        <g id="roverMark" transform="translate(110 410)">
+          <circle r="16" fill="var(--accent)" opacity=".18"><animate attributeName="r" values="12;20;12" dur="2s" repeatCount="indefinite"/></circle>
+          <rect x="-10" y="-7" width="20" height="14" rx="4" fill="var(--ink)"/>
+          <rect x="-6" y="-4" width="8" height="8" rx="2" fill="var(--accent)"/>
+        </g>
+      </svg>
+    </div>
+    <div class="ctrl">
+      <button class="primary" id="runBtn">Run patrol simulation</button>
+      <button id="speedBtn" title="Change simulation speed">Speed 1×</button>
+      <div class="prog" aria-hidden="true"><i id="progBar"></i></div>
+      <span class="stat" id="progTxt">Next patrol 16:00 · route 1.4 km · 12 tagged saplings</span>
+    </div>
+    <div id="detail" class="detail" aria-live="polite"></div>
+  </div>
+
+  <div class="side">
+    <div class="panel">
+      <div class="ph"><h2>Maintenance tickets</h2><span class="stat" id="tCount"></span></div>
+      <div class="tickets" id="tickets"></div>
+    </div>
+    <div class="panel resident">
+      <div class="ph"><h2>Resident view</h2><span class="label">Township app</span></div>
+      <p id="resShade">–</p>
+      <p id="resBirds" class="muted">–</p>
+    </div>
+  </div>
+</section>
+
+<section class="row3">
+  <div class="panel">
+    <div class="ph"><h2>Biodiversity</h2><span class="stat" id="hitRate"></span></div>
+    <svg id="weekChart" viewBox="0 0 360 110" role="img" aria-label="Bird detections per day this week" style="width:100%;height:auto"></svg>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Species</th><th class="n">Det.</th><th class="n">Conf.</th><th>Status</th></tr></thead>
+      <tbody id="birdRows"></tbody>
+    </table></div>
+  </div>
+  <div class="panel">
+    <div class="ph"><h2>Heat transect</h2><span class="stat" id="heatWhen"></span></div>
+    <svg id="heatChart" viewBox="0 0 360 200" role="img" aria-label="Air temperature difference from the reference station along the patrol route" style="width:100%;height:auto"></svg>
+    <p class="muted" style="margin:0;font-size:12px">The dashed line is the fixed reference station. Each reading is compared with it at the same moment, so time of day cancels out. Shaded bands are tree canopy.</p>
+  </div>
+  <div class="panel">
+    <div class="ph"><h2>Audit trail</h2><span class="stat mono" id="logCount"></span></div>
+    <div class="chain">
+      <span id="chainState" class="pill p-mute"><span class="dot"></span>Not checked</span>
+      <button class="small" id="verifyBtn">Verify chain</button>
+      <button class="small" id="tamperBtn">Simulate tampering</button>
+    </div>
+    <div class="log" id="log"></div>
+    <p class="muted" style="margin:0;font-size:12px">Every record is hashed together with the one before it, so editing any past record breaks every hash after it.</p>
+  </div>
+</section>
+<footer>Prototype console for the TerraScout ESG audit rover · Sime Darby Property University Hackathon 2026 · All data is simulated.</footer>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(function(){
+"use strict";
+// ---------- helpers ----------
+const $ = id => document.getElementById(id);
+const NS = "http://www.w3.org/2000/svg";
+const el = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; };
+const pad = n => String(n).padStart(2, "0");
+const fmtT = d => pad(d.getHours()) + ":" + pad(d.getMinutes());
+let seed = 7; const rnd = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+function toast(msg){ const t = $("toast"); t.textContent = msg; t.classList.add("on"); clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove("on"), 2600); }
+
+// ---------- route ----------
+const route = $("route"); const L = route.getTotalLength();
+const at = t => route.getPointAtLength(Math.max(0, Math.min(1, t)) * L);
+const normal = t => { const a = at(t - 0.002), b = at(t + 0.002); const dx = b.x - a.x, dy = b.y - a.y, m = Math.hypot(dx, dy) || 1; return { x: -dy / m, y: dx / m }; };
+const CANOPY = [[0.17, 0.33], [0.53, 0.63], [0.83, 0.9]];
+const inCanopy = t => CANOPY.some(([a, b]) => t >= a && t <= b);
+// canopy blobs drawn along the route
+(function(){ const g = $("canopyLayer");
+  CANOPY.forEach(([a, b]) => { for (let t = a; t <= b + 1e-9; t += 0.02) { const p = at(t), n = normal(t);
+    [-1, 1].forEach(s => { const r = 26 + rnd() * 14; el("circle", { cx: p.x + n.x * s * 22 + (rnd() - .5) * 10, cy: p.y + n.y * s * 22 + (rnd() - .5) * 10, r, fill: "var(--canopy)", stroke: "var(--canopy-edge)", "stroke-width": 1 }, g); }); } });
+})();
+
+// ---------- data ----------
+const BASE = new Date(2026, 9, 19, 15, 12);
+const SPECIES = ["Meranti (Shorea)", "Keruing (Dipterocarpus)", "Merawan (Hopea)", "Kapur (Dryobalanops)"];
+const saplings = [
+  [0.07,-1,[.80,.81,.82,.83,.84]],[0.13,1,[.76,.78,.77,.79,.80]],[0.22,-1,[.66,.62,.58,.56,.55]],[0.29,1,[.82,.83,.85,.84,.86]],
+  [0.38,-1,[.79,.80,.80,.81,.82]],[0.46,1,[.74,.76,.78,.77,.79]],[0.56,-1,[.78,.74,.69,.64,.60]],[0.61,1,[.83,.84,.83,.85,.86]],
+  [0.70,-1,[.72,.73,.75,.74,.76]],[0.77,1,[.81,.82,.82,.83,.83]],[0.86,-1,[.31,.22,.15,.10,.08]],[0.93,1,[.77,.78,.79,.80,.81]]
+].map(([t, side, hist], i) => ({ tag: "TS-" + pad(i + 1), t, side, hist, species: SPECIES[i % 4], planted: ["Mar 2024","Jun 2024","Sep 2024","Jan 2025"][i % 4], g: hist[hist.length - 1], checked: "Yesterday 16:20" }));
+const statusOf = g => g < 0.15 ? "lost" : g < 0.45 ? "stressed" : g < 0.6 ? "watch" : "healthy";
+const STATUS = { healthy:["Healthy","p-good","var(--good)"], watch:["Watch","p-warn","var(--warn)"], stressed:["Stressed","p-crit","var(--crit)"], lost:["Lost","p-crit","var(--crit)"] };
+// this patrol's readings (TS-07 drops below the stress line)
+const PATROL_G = { "TS-07": 0.41, "TS-03": 0.57 };
+
+const birds = [
+  { sp:"Yellow-vented Bulbul", det:14, conf:.91, verified:true },
+  { sp:"Oriental Magpie-Robin", det:9, conf:.88, verified:true },
+  { sp:"Spotted Dove", det:6, conf:.84, verified:true },
+  { sp:"Collared Kingfisher", det:3, conf:.71, verified:false },
+  { sp:"Pink-necked Green Pigeon", det:2, conf:.63, verified:false }
+];
+const STATIONS = [ { id:"S1", t:0.33, hit:{ sp:"Common Iora", conf:.76 } }, { id:"S2", t:0.72, hit:{ sp:"Oriental Magpie-Robin", conf:.9 } } ];
+const week = [11, 9, 14, 8, 12, 10, 0]; // Tue..Mon, today fills during patrol
+const WEEKDAYS = ["Tue","Wed","Thu","Fri","Sat","Sun","Mon"];
+
+const tickets = [
+  { id:"TK-117", tag:"TS-11", title:"Sapling lost: replace from nursery", status:"Open", crew:"Unassigned", opened:"Oct 16", ai:null },
+  { id:"TK-118", tag:"TS-03", title:"Low greenness: check water and soil", status:"In progress", crew:"Landscape crew B", opened:"Oct 14", ai:"Server YOLO: nutrient deficiency (0.64)" }
+];
+const TSTATUS = { "Open":"p-warn", "In progress":"p-acc", "Resolved":"p-good" };
+
+// heat: deterministic readings along the route
+function heatAt(t, k){ const shade = inCanopy(t); return +( (shade ? -3.9 : 1.6) + Math.sin(t * 40 + k) * 0.5 ).toFixed(1); }
+let heat = []; for (let t = 0.03; t < 0.99; t += 0.04) heat.push({ t, d: heatAt(t, 1) });
+let heatLabel = "Yesterday 16:20";
+
+// ---------- audit log (hash chain) ----------
+const log = [];
+const hasSubtle = !!(window.crypto && crypto.subtle && crypto.subtle.digest);
+async function sha(s){
+  if (hasSubtle) { const b = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s)); return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, "0")).join(""); }
+  let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0).toString(16).padStart(8, "0").repeat(8);
+}
+const body = r => JSON.stringify([r.seq, r.ts, r.type, r.data, r.prev]);
+let chainQ = Promise.resolve();
+function addRecord(type, data, when){
+  chainQ = chainQ.then(async () => {
+    const prev = log.length ? log[log.length - 1].hash : "0".repeat(64);
+    const r = { seq: log.length + 1, ts: when.toISOString(), type, data, prev };
+    r.hash = await sha(body(r)); log.push(r); renderLog(true);
+  });
+  return chainQ;
+}
+async function verify(){
+  for (let i = 0; i < log.length; i++) {
+    const r = log[i], prev = i ? log[i - 1].hash : "0".repeat(64);
+    if (r.prev !== prev || await sha(body(r)) !== r.hash) return i;
+  }
+  return -1;
+}
+let badIdx = -1, tampered = null;
+function describe(r){
+  const d = r.data;
+  if (r.type === "sapling_check") return `${d.tag} photo + greenness ${d.g.toFixed(2)}`;
+  if (r.type === "bird_audio") return `${d.station} ${d.species} (${d.conf.toFixed(2)})`;
+  if (r.type === "heat") return `Heat ${d.delta > 0 ? "+" : ""}${d.delta.toFixed(1)} °C vs ref`;
+  if (r.type === "sync") return `Sync ${d.photos} photos to server`;
+  if (r.type === "yolo") return `Server YOLO on ${d.tag}: ${d.label}`;
+  return r.type;
+}
+function renderLog(fresh){
+  const box = $("log"); box.textContent = "";
+  log.slice(-7).reverse().forEach(r => {
+    const row = document.createElement("div"); row.className = "r" + (badIdx >= 0 && r.seq - 1 >= badIdx ? " bad" : "");
+    row.innerHTML = `<span class="mono muted">#${r.seq}</span><span>${describe(r)}</span><span class="hash" title="${r.hash}">${r.hash.slice(0, 8)}…</span>`;
+    box.appendChild(row);
+  });
+  $("logCount").textContent = log.length + " records";
+  updateKpis();
+}
+function setChain(state, idx){
+  const c = $("chainState");
+  if (state === "ok") { c.className = "pill p-good"; c.innerHTML = '<span class="dot"></span>Chain intact'; }
+  else if (state === "bad") { c.className = "pill p-crit"; c.innerHTML = `<span class="dot"></span>Broken at #${idx + 1}`; }
+  else { c.className = "pill p-mute"; c.innerHTML = '<span class="dot"></span>Not checked'; }
+  updateKpis();
+}
+let chainState = "ok";
+$("verifyBtn").onclick = async () => { await chainQ; const i = await verify(); badIdx = i; chainState = i < 0 ? "ok" : "bad"; setChain(chainState, i); renderLog();
+  toast(i < 0 ? `All ${log.length} records check out.` : `Record #${i + 1} was changed after it was logged.`); };
+$("tamperBtn").onclick = async () => {
+  await chainQ;
+  if (tampered) { tampered.r.data = tampered.orig; tampered = null; $("tamperBtn").textContent = "Simulate tampering"; toast("Original record restored. Verify again to confirm."); }
+  else { const r = log.find(x => x.type === "heat") || log[2]; tampered = { r, orig: r.data }; r.data = Object.assign({}, r.data, { delta: r.data.delta - 2 }); $("tamperBtn").textContent = "Restore record"; toast(`Edited record #${r.seq} to look 2 °C cooler. Now verify the chain.`); }
+  chainState = "unchecked"; badIdx = -1; setChain("unchecked"); renderLog();
+};
+
+// ---------- map layers ----------
+const sapNodes = {};
+function drawSaplings(){
+  const g = $("sapLayer"); g.textContent = "";
+  saplings.forEach(s => {
+    const p = at(s.t), n = normal(s.t), x = p.x + n.x * s.side * 26, y = p.y + n.y * s.side * 26;
+    s.x = x; s.y = y;
+    const st = statusOf(s.g);
+    const node = el("g", { class: "sap", tabindex: 0, role: "button", "aria-label": `${s.tag}, ${STATUS[st][0]}` }, g);
+    el("line", { x1: p.x + n.x * s.side * 8, y1: p.y + n.y * s.side * 8, x2: x, y2: y, stroke: "var(--muted)", "stroke-width": 1, "stroke-dasharray": "2 2" }, node);
+    el("circle", { cx: x, cy: y, r: 9, fill: STATUS[st][2], stroke: "var(--surface)", "stroke-width": 2 }, node);
+    const lab = el("text", { x, y: y + (s.side * n.y > 0 ? 22 : -14), "text-anchor": "middle", "font-size": 10.5, fill: "var(--ink)", "font-family": "var(--mono)" }, node); lab.textContent = s.tag;
+    node.addEventListener("click", () => showDetail(s)); node.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); showDetail(s); } });
+    sapNodes[s.tag] = node;
+  });
+}
+function drawStations(){
+  const g = $("birdLayer"); g.textContent = "";
+  STATIONS.forEach(st => { const p = at(st.t), n = normal(st.t), x = p.x - n.x * 34, y = p.y - n.y * 34;
+    el("circle", { cx: x, cy: y, r: 11, fill: "var(--bird)" }, g);
+    el("path", { d: `M${x - 4} ${y - 3}v6M${x} ${y - 6}v12M${x + 4} ${y - 3}v6`, stroke: "var(--surface)", "stroke-width": 1.8, "stroke-linecap": "round" }, g);
+    st.x = x; st.y = y; });
+}
+function heatColor(d){ const k = Math.max(0, Math.min(1, (d + 5) / 8)); return k > 0.5 ? `color-mix(in srgb, var(--heat) ${Math.round((k - .5) * 200)}%, var(--surface))` : `color-mix(in srgb, var(--cool) ${Math.round((.5 - k) * 200)}%, var(--surface))`; }
+function drawHeatDots(){
+  const g = $("heatLayer"); g.textContent = "";
+  heat.forEach(h => { const p = at(h.t); el("circle", { cx: p.x, cy: p.y, r: 5.5, fill: heatColor(h.d), stroke: "var(--ink)", "stroke-opacity": .25, "stroke-width": 1 }, g); });
+}
+
+// ---------- panels ----------
+function leafSvg(g){
+  const c = g >= 0.6 ? "var(--good)" : g >= 0.45 ? "var(--warn)" : g >= 0.15 ? "var(--heat)" : "var(--muted)";
+  return `<svg viewBox="0 0 88 88" width="88" height="88" role="img" aria-label="Latest photo thumbnail"><rect width="88" height="88" rx="8" fill="var(--lawn)"/><path d="M44 78V40" stroke="var(--muted)" stroke-width="2"/><path d="M44 52c-16-2-24-14-22-30 14 2 22 12 22 30z" fill="${c}"/><path d="M44 46c14-4 20-16 18-30-14 4-20 14-18 30z" fill="${c}" opacity=".85"/>${g < 0.6 ? '<circle cx="34" cy="34" r="3" fill="var(--warn)"/><circle cx="54" cy="28" r="2.5" fill="var(--warn)"/>' : ''}</svg>`;
+}
+function spark(hist){
+  const w = 140, h = 30, n = hist.length, xs = i => 4 + i * (w - 8) / (n - 1), ys = v => h - 4 - v * (h - 8);
+  const pts = hist.map((v, i) => `${xs(i).toFixed(1)},${ys(v).toFixed(1)}`).join(" ");
+  const last = hist[n - 1];
+  return `<svg viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" aria-hidden="true"><line x1="0" x2="${w}" y1="${ys(.6)}" y2="${ys(.6)}" stroke="var(--line)" stroke-dasharray="3 3"/><polyline points="${pts}" fill="none" stroke="var(--accent)" stroke-width="1.8"/><circle cx="${xs(n - 1)}" cy="${ys(last)}" r="3" fill="${STATUS[statusOf(last)][2]}"/></svg>`;
+}
+let selected = null;
+function showDetail(s){
+  selected = s; const st = statusOf(s.g);
+  $("detail").innerHTML = `${leafSvg(s.g)}<div><div class="t-top"><h3>${s.tag} · ${s.species}</h3><span class="pill ${STATUS[st][1]}"><span class="dot"></span>${STATUS[st][0]}</span></div>
+  <dl class="kv"><dt>Greenness</dt><dd class="mono">${s.g.toFixed(2)} <span class="muted">(care below 0.60)</span></dd><dt>Last 6 checks</dt><dd>${spark(s.hist.concat(s.hist.length < 6 ? [s.g] : []).slice(-6))}</dd><dt>Planted</dt><dd>${s.planted}</dd><dt>Last check</dt><dd>${s.checked}</dd></dl></div>`;
+}
+function renderTickets(newId){
+  const box = $("tickets"); box.textContent = "";
+  tickets.forEach(t => {
+    const d = document.createElement("div"); d.className = "ticket" + (t.id === newId ? " new" : "");
+    const next = t.status === "Open" ? "Assign crew" : t.status === "In progress" ? "Mark resolved" : null;
+    d.innerHTML = `<div class="t-top"><span class="t-title">${t.title}</span><span class="pill ${TSTATUS[t.status]}"><span class="dot"></span>${t.status}</span></div>
+      <div class="t-meta"><span class="mono">${t.id}</span> · ${t.tag} · ${t.crew} · opened ${t.opened}</div>
+      ${t.ai ? `<div class="t-ai">${t.ai}</div>` : ""}
+      <div class="ctrl">${next ? `<button class="small" data-id="${t.id}">${next}</button>` : ""}<button class="small" data-show="${t.tag}">Show on map</button></div>`;
+    box.appendChild(d);
+  });
+  box.querySelectorAll("button[data-id]").forEach(b => b.onclick = () => { const t = tickets.find(x => x.id === b.dataset.id);
+    if (t.status === "Open") { t.status = "In progress"; t.crew = "Landscape crew A"; } else { t.status = "Resolved"; } renderTickets(); updateKpis(); });
+  box.querySelectorAll("button[data-show]").forEach(b => b.onclick = () => showDetail(saplings.find(s => s.tag === b.dataset.show)));
+  const open = tickets.filter(t => t.status !== "Resolved").length; $("tCount").textContent = open + " open";
+}
+function renderBirds(freshSp){
+  const rows = $("birdRows"); rows.textContent = "";
+  birds.slice().sort((a, b) => b.det - a.det).forEach(b => {
+    const tr = document.createElement("tr"); if (b.sp === freshSp) tr.className = "fresh";
+    tr.innerHTML = `<td>${b.sp}</td><td class="n">${b.det}</td><td class="n">${b.conf.toFixed(2)}</td><td>${b.verified ? '<span class="pill p-good"><span class="dot"></span>Verified</span>' : `<button class="small" data-v="${b.sp}">Verify</button>`}</td>`;
+    rows.appendChild(tr);
+  });
+  rows.querySelectorAll("button[data-v]").forEach(btn => btn.onclick = () => { birds.find(x => x.sp === btn.dataset.v).verified = true; renderBirds(); updateKpis(); toast(`${btn.dataset.v} confirmed by ecologist.`); });
+  // week chart
+  const svg = $("weekChart"); svg.textContent = ""; const max = 16, bw = 34, gap = 16, x0 = 20, base = 86;
+  el("line", { x1: 10, x2: 350, y1: base, y2: base, stroke: "var(--line)" }, svg);
+  week.forEach((v, i) => { const h = v / max * 66, x = x0 + i * (bw + gap);
+    el("rect", { x, y: base - h, width: bw, height: Math.max(h, 1), rx: 4, fill: i === 6 ? "var(--bird)" : "color-mix(in srgb, var(--bird) 35%, var(--surface))" }, svg);
+    const tv = el("text", { x: x + bw / 2, y: base - h - 5, "text-anchor": "middle", "font-size": 11, fill: "var(--ink)", "font-family": "var(--mono)" }, svg); tv.textContent = v;
+    const tl = el("text", { x: x + bw / 2, y: base + 16, "text-anchor": "middle", "font-size": 11, fill: "var(--muted)", "font-family": "var(--body)" }, svg); tl.textContent = WEEKDAYS[i]; });
+}
+function renderHeat(){
+  const svg = $("heatChart"); svg.textContent = ""; const X = t => 40 + t * 305, Y = d => 72 - d * 18;
+  CANOPY.forEach(([a, b]) => el("rect", { x: X(a), y: 14, width: X(b) - X(a), height: 152, fill: "var(--canopy)", opacity: .35 }, svg));
+  [-4, -2, 0, 2].forEach(v => { el("line", { x1: 40, x2: 345, y1: Y(v), y2: Y(v), stroke: v === 0 ? "var(--ink)" : "var(--line)", "stroke-dasharray": v === 0 ? "4 3" : "" }, svg);
+    const t = el("text", { x: 34, y: Y(v) + 4, "text-anchor": "end", "font-size": 11, fill: "var(--muted)", "font-family": "var(--mono)" }, svg); t.textContent = (v > 0 ? "+" : "") + v; });
+  if (heat.length) {
+    el("polyline", { points: heat.map(h => `${X(h.t).toFixed(1)},${Y(h.d).toFixed(1)}`).join(" "), fill: "none", stroke: "var(--accent)", "stroke-width": 2 }, svg);
+    heat.forEach(h => el("circle", { cx: X(h.t), cy: Y(h.d), r: 3, fill: heatColor(h.d), stroke: "var(--ink)", "stroke-opacity": .3 }, svg));
+  }
+  const ax = el("text", { x: 192, y: 192, "text-anchor": "middle", "font-size": 11, fill: "var(--muted)", "font-family": "var(--body)" }, svg); ax.textContent = "Distance along route (0 – 1.4 km) · °C vs reference";
+  $("heatWhen").textContent = heatLabel;
+}
+function shadeDelta(){ const s = heat.filter(h => inCanopy(h.t)), o = heat.filter(h => !inCanopy(h.t)); if (!s.length || !o.length) return null;
+  const m = a => a.reduce((x, h) => x + h.d, 0) / a.length; return m(s) - m(o); }
+function updateKpis(){
+  const lost = saplings.filter(s => statusOf(s.g) === "lost").length, care = saplings.filter(s => ["watch", "stressed"].includes(statusOf(s.g))).length;
+  $("kSurv").textContent = ((saplings.length - lost) / saplings.length * 100).toFixed(1) + "%";
+  $("kSurvD").textContent = `${saplings.length - lost} of ${saplings.length} alive · goal 50,000 Red List trees by 2030`;
+  $("kFlag").textContent = care; $("kFlagD").textContent = `${saplings.filter(s => statusOf(s.g) === "stressed").length} stressed, ${saplings.filter(s => statusOf(s.g) === "watch").length} on watch`;
+  $("kFlagBox").classList.toggle("flag", care > 0);
+  const ver = birds.filter(b => b.verified).length; $("kSp").textContent = birds.length; $("kSpD").textContent = `${ver} verified · ${birds.length - ver} candidates`;
+  const dt = shadeDelta(); $("kDT").textContent = dt == null ? "–" : dt.toFixed(1).replace("-", "−") + " °C";
+  $("kAud").textContent = chainState === "ok" ? "Intact" : chainState === "bad" ? "Broken" : "Unchecked";
+  $("kAud").style.color = chainState === "bad" ? "var(--crit)" : "";
+  $("kAudD").textContent = log.length + " hash-linked records";
+  const best = dt == null ? "–" : Math.abs(dt).toFixed(1);
+  $("resShade").innerHTML = `<b>Coolest walk this afternoon:</b> the canopy stretch by the lake, about ${best} °C cooler than the open path.`;
+  $("resBirds").textContent = `Birds heard this week: ${birds.map(b => b.sp).slice(0, 4).join(", ")} and ${Math.max(0, birds.length - 4)} more.`;
+  $("hitRate").textContent = "Ecologist spot-check: 42 of 48 AI IDs correct (88%)";
+}
+
+// ---------- simulation ----------
+const DURATION = 36000; let speed = 1, running = false, tNow = 0, lastFrame = 0, events = [], clockStart;
+$("speedBtn").onclick = () => { speed = speed === 1 ? 3 : speed === 3 ? 6 : 1; $("speedBtn").textContent = `Speed ${speed}×`; };
+function setState(text, cls){ const s = $("roverState"); s.className = "pill " + cls; s.innerHTML = `<span class="dot"></span>${text}`; }
+function simTime(){ return new Date(clockStart.getTime() + tNow * 80 * 60000); } // one patrol = about 80 minutes of park time
+function buildEvents(){
+  events = [];
+  saplings.forEach(s => events.push({ t: s.t, kind: "sap", s }));
+  STATIONS.forEach(st => events.push({ t: st.t, kind: "bird", st }));
+  for (let t = 0.03; t < 0.99; t += 0.04) events.push({ t, kind: "heat" });
+  events.sort((a, b) => a.t - b.t);
+}
+function fire(ev){
+  const when = simTime();
+  if (ev.kind === "sap") { const s = ev.s; const g = PATROL_G[s.tag] != null ? PATROL_G[s.tag] : Math.min(.95, s.g + (rnd() - .4) * .02);
+    s.hist.push(s.g); if (s.hist.length > 5) s.hist.shift(); s.g = +g.toFixed(2); s.checked = "Today " + fmtT(when);
+    addRecord("sapling_check", { tag: s.tag, g: s.g, photo: `TS1_${s.tag}_${fmtT(when).replace(":", "")}.jpg` }, when);
+    drawSaplings(); if (selected === s || statusOf(s.g) === "stressed") showDetail(s);
+    if (statusOf(s.g) === "stressed" && !tickets.some(t => t.tag === s.tag && t.status !== "Resolved")) {
+      tickets.unshift({ id: "TK-119", tag: s.tag, title: "Stressed sapling: leaves yellowing", status: "Open", crew: "Unassigned", opened: "Today " + fmtT(when), ai: "Rover check: greenness " + s.g.toFixed(2) + " (below 0.45). Full model runs after upload." });
+      renderTickets("TK-119"); toast(`${s.tag} flagged: greenness ${s.g.toFixed(2)}. Ticket TK-119 raised.`); } }
+  if (ev.kind === "bird") { const h = ev.st.hit; let b = birds.find(x => x.sp === h.sp);
+    if (b) { b.det++; b.conf = Math.max(b.conf, h.conf); } else { birds.push(b = { sp: h.sp, det: 1, conf: h.conf, verified: false }); toast(`New candidate species at ${ev.st.id}: ${h.sp} (${h.conf.toFixed(2)}).`); }
+    week[6] += 1; addRecord("bird_audio", { station: ev.st.id, species: h.sp, conf: h.conf }, when); renderBirds(h.sp); }
+  if (ev.kind === "heat") { const d = heatAt(ev.t, 2); heat.push({ t: ev.t, d }); addRecord("heat", { t: +ev.t.toFixed(2), delta: d }, when); drawHeatDots(); renderHeat(); }
+  updateKpis();
+}
+function frame(ts){
+  if (!running) return;
+  const dt = lastFrame ? ts - lastFrame : 0; lastFrame = ts; tNow = Math.min(1, tNow + dt * speed / DURATION);
+  const p = at(tNow), q = at(Math.min(1, tNow + .003)), ang = Math.atan2(q.y - p.y, q.x - p.x) * 180 / Math.PI;
+  $("roverMark").setAttribute("transform", `translate(${p.x.toFixed(1)} ${p.y.toFixed(1)}) rotate(${ang.toFixed(1)})`);
+  while (events.length && events[0].t <= tNow) fire(events.shift());
+  $("progBar").style.width = (tNow * 100).toFixed(1) + "%";
+  $("progTxt").textContent = `${(tNow * 1.4).toFixed(2)} of 1.4 km · ${fmtT(simTime())}`;
+  $("batt").textContent = Math.round(96 - tNow * 18) + "%";
+  if (tNow >= 1) return finish();
+  requestAnimationFrame(frame);
+}
+async function finish(){
+  running = false; setState("Uploading", "p-bird");
+  const when = simTime(); await addRecord("sync", { photos: saplings.length * 3 }, when);
+  $("progTxt").textContent = `Uploading ${saplings.length * 3} photos for full analysis…`;
+  setTimeout(async () => {
+    const t = tickets.find(x => x.id === "TK-119");
+    if (t) { t.ai = "Server YOLO: leaf spot, likely fungal (0.78). Rover greenness 0.41."; await addRecord("yolo", { tag: t.tag, label: "leaf spot 0.78" }, when); renderTickets("TK-119"); }
+    setState("Docked · charging", "p-good"); $("lastSync").textContent = fmtT(when); $("runBtn").disabled = false; $("runBtn").textContent = "Run patrol again";
+    $("progTxt").textContent = "Patrol complete · full analysis attached to tickets"; heatLabel = "Today " + fmtT(when); renderHeat();
+    toast("Patrol synced. Server YOLO result added to TK-119.");
+  }, 1600 / speed);
+}
+$("runBtn").onclick = () => {
+  if (running) return; running = true; $("runBtn").disabled = true; tNow = 0; lastFrame = 0; heat = []; drawHeatDots(); renderHeat();
+  heatLabel = "Today, in progress"; clockStart = new Date(2026, 9, 19, 16, 0); buildEvents(); setState("Patrolling", "p-acc"); requestAnimationFrame(frame);
+};
+
+// ---------- boot: yesterday's records ----------
+(async function boot(){
+  drawSaplings(); drawStations(); drawHeatDots(); renderTickets(); renderBirds(); renderHeat(); showDetail(saplings[6]);
+  let d = new Date(2026, 9, 18, 16, 0);
+  for (const s of saplings) { d = new Date(d.getTime() + 4 * 60000); await addRecord("sapling_check", { tag: s.tag, g: s.g, photo: `TS1_${s.tag}_y.jpg` }, d); }
+  for (const h of heat.filter((_, i) => i % 3 === 0)) { d = new Date(d.getTime() + 60000); await addRecord("heat", { t: +h.t.toFixed(2), delta: h.d }, d); }
+  await addRecord("sync", { photos: 36 }, new Date(2026, 9, 18, 17, 30));
+  updateKpis();
+})();
+})();
+</script>
+</body>
+</html>
